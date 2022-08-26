@@ -1,0 +1,60 @@
+name: Trigger auto deployment for appmanagerea843ea6
+
+# When this action will be executed
+on:
+  # Automatically trigger it when detected changes in repo
+  push:
+    branches: 
+      [ master ]
+    paths:
+    - '**'
+    - '.github/workflows/appmanagerea843ea6-AutoDeployTrigger-1634574d-7b3d-463c-9d7b-9d5e89753eb4.yml'
+
+  # Allow mannually trigger 
+  workflow_dispatch:      
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to container registry
+        uses: docker/login-action@v1
+        with:
+          registry: appmanageref3bd08a.azurecr.io
+          username: ${{ secrets.APPMANAGEREA843EA6_REGISTRY_USERNAME }}
+          password: ${{ secrets.APPMANAGEREA843EA6_REGISTRY_PASSWORD }}
+
+      - name: Build and push container image to registry
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: appmanageref3bd08a.azurecr.io/appmanagerea843ea6:${{ github.sha }}
+          file: ./Dockerfile
+          context: ./
+
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.APPMANAGEREA843EA6_AZURE_CREDENTIALS }}
+
+
+      - name: Deploy to containerapp
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az config set extension.use_dynamic_install=yes_without_prompt
+            az containerapp registry set -n appmanagerea843ea6 -g AppManager-D-Norway-RG --server appmanageref3bd08a.azurecr.io --username  ${{ secrets.APPMANAGEREA843EA6_REGISTRY_USERNAME }} --password ${{ secrets.APPMANAGEREA843EA6_REGISTRY_PASSWORD }}
+            az containerapp update -n appmanagerea843ea6 -g AppManager-D-Norway-RG --image appmanageref3bd08a.azurecr.io/appmanagerea843ea6:${{ github.sha }}
